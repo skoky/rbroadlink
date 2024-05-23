@@ -199,7 +199,7 @@ fn create_device_from_packet(
     bytes: &[u8],
 ) -> Result<Device, String> {
     // Make sure that we have the required amount of bytes
-    if bytes_received != 128 {
+    if bytes_received < 128 {
         return Err("Received invalid response! Not enough data.".into());
     }
 
@@ -209,7 +209,7 @@ fn create_device_from_packet(
         _ => return Err("Device has an IPv6 Address! This should be impossible...".into()),
     };
 
-    let response = DiscoveryResponse::unpack_from_slice(&bytes)
+    let response = DiscoveryResponse::unpack_from_slice(&bytes[0..128])
         .map_err(|e| format!("Could not unpack response from device! {}", e))?;
 
     // Decode the name
