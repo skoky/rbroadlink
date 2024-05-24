@@ -124,6 +124,11 @@ impl CommandMessage {
 
     /// Unpack the command message with the associated payload.
     pub fn unpack_with_payload(mut bytes: Vec<u8>, key: &[u8; 16]) -> Result<Vec<u8>, String> {
+
+        if bytes.len() == 0x38 {
+            return Err("Device locked?".to_string())
+        }
+
         // Ensure that the data is correct
         if bytes.len() < 0x38 {
             return Err(format!(
