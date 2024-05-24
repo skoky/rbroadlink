@@ -154,6 +154,15 @@ impl RemoteDevice {
         return Ok(());
     }
 
+    /// Sends an IR/RF code to the world.
+    pub async fn send_code_async(&self, code: &[u8]) -> Result<(), String> {
+        self.send_command_async(code, RemoteDataCommand::SendCode)
+            .await
+            .map_err(|e| format!("Could not send IR code to device! {}", e))?;
+
+        return Ok(());
+    }
+
     /// Sends a raw command to the remote.
     /// Note: Try to avoid using this method in favor of [RemoteDevice::send_code], [RemoteDevice::learn_ir], etc.
     pub fn send_command(
@@ -175,6 +184,33 @@ impl RemoteDevice {
 
         let response = generic_device
             .send_command::<RemoteDataMessage>(&packed)
+            .map_err(|e| format!("Could not send code inside of the command! {}", e))?;
+
+        return RemoteDataMessage::unpack_with_payload(&response);
+    }
+
+    /// Sends a raw command to the remote.
+    /// Note: Try to avoid using this method in favor of [RemoteDevice::send_code], [RemoteDevice::learn_ir], etc.
+    pub async fn send_command_async(
+        &self,
+        payload: &[u8],
+        command: RemoteDataCommand,
+    ) -> Result<Vec<u8>, String> {
+        // We cast this object to a generic device in order to make use of the shared
+        // helper utilities.
+        let generic_device = Device::Remote {
+            remote: self.clone(),
+        };
+
+        // Construct the data message
+        let msg = RemoteDataMessage::new(command);
+        let packed = msg
+            .pack_with_payload(&payload)
+            .map_err(|e| format!("Could not pack remote data message! {}", e))?;
+
+        let response = generic_device
+            .send_command_async::<RemoteDataMessage>(&packed)
+            .await
             .map_err(|e| format!("Could not send code inside of the command! {}", e))?;
 
         return RemoteDataMessage::unpack_with_payload(&response);

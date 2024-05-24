@@ -15,6 +15,7 @@ use crate::{
     traits::{CommandTrait, DeviceTrait},
     DeviceInfo, HvacDevice, RemoteDevice, HVAC_CODES, REMOTE_CODES,
 };
+use crate::network::util::send_and_receive_one_async;
 
 /// A generic broadlink device.
 pub enum Device {
@@ -42,6 +43,25 @@ impl Device {
             send_and_receive_one(&msg, addr, Some(port), |bytes_received, bytes, addr| {
                 return create_device_from_packet(addr, bytes_received, bytes);
             })
+            .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
+        );
+    }
+
+    pub async fn from_ip_async(addr: Ipv4Addr, local_ip: Option<Ipv4Addr>) -> Result<Device, String> {
+        // Grab the first non-loopback address
+        let selected_ip = local_ip_or(local_ip)?;
+
+        // Construct the discovery message
+        let port = 42424;
+        let discover = DiscoveryMessage::new(selected_ip, port, None)?;
+        let msg = discover
+            .pack()
+            .map_err(|e| format!("Could not pack DiscoveryMessage! {}", e))?;
+
+        return Ok(
+            send_and_receive_one_async(&msg, addr, Some(port), |bytes_received, bytes, addr| {
+                return create_device_from_packet(addr, bytes_received, bytes);
+            }).await
             .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
         );
     }
@@ -172,6 +192,28 @@ impl Device {
         return send_and_receive_one(&packed, info.address, None, |_, bytes, _| {
             return CommandMessage::unpack_with_payload(bytes.to_vec(), &info.key);
         });
+    }
+
+    /// Sends a raw command to a broadlink device.
+    /// Note: Try to avoid using this method in favor of more specific methods (e.g. [Device::authenticate], etc.)
+    pub async fn send_command_async<T>(&self, payload: &[u8]) -> Result<Vec<u8>, String>
+    where
+        T: CommandTrait,
+    {
+        let info = self.get_info();
+
+        // Construct the command.
+        let cmd = CommandMessage::new::<T>(info.model_code, info.mac, info.auth_id);
+
+        // Pack the message with the payload
+        let packed = cmd
+            .pack_with_payload(&payload, &info.key)
+            .map_err(|e| format!("Could not pack command with payload! {}", e))?;
+
+        // Send the message to the device
+        return send_and_receive_one_async(&packed, info.address, None, |_, bytes, _| {
+            return CommandMessage::unpack_with_payload(bytes.to_vec(), &info.key);
+        }).await;
     }
 }
 
