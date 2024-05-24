@@ -75,6 +75,35 @@ impl Device {
         return Ok(results);
     }
 
+    /// List all devices in the current network. Optionally specify the local IP if on different subnets.
+    pub async fn list_async(ip: Option<Ipv4Addr>) -> Result<Vec<Device>, String> {
+        // Grab the first non-loopback address
+        let selected_ip = local_ip_or(ip)?;
+
+        // Construct the discovery message
+        let port = 42424;
+        let discover = DiscoveryMessage::new(selected_ip, port, None)?;
+        let msg = discover
+            .pack()
+            .map_err(|e| format!("Could not pack DiscoveryMessage! {}", e))?;
+
+        let results = send_and_receive_many(
+            &msg,
+            Ipv4Addr::BROADCAST,
+            Some(port),
+            |bytes_received, bytes, addr| {
+                return Ok(create_device_from_packet(addr, bytes_received, &bytes)
+                    .map_err(|e| format!("Could not create device from packet! {}", e))?);
+            },
+        )
+        .map_err(|e| format!("Could not send discovery message! {}", e))?;
+
+        // Remove duplicates
+        // TODO
+
+        return Ok(results);
+    }
+
     /// Authenticate a device. This is needed before any commands can be sent.
     ///
     /// Note: This is automatically called when constructing a device.
