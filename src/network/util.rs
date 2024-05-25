@@ -131,7 +131,7 @@ pub fn send_and_receive_many<I, T>(
         T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
 {
     // Get the socket
-    let socket = send_and_receive_impl_async(msg, addr, port)
+    let socket = send_and_receive_impl(msg, addr, port)
         .map_err(|e| format!("Could not create socket for message sending! {}", e))?;
 
     // Transform the results
