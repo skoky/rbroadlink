@@ -97,14 +97,16 @@ fn send_and_receive_impl(
 async fn send_and_receive_impl_async(
     msg: &[u8],
     addr: Ipv4Addr,
-    port: Option<u16>,
+    port: u16,
 ) -> Result<tokio::net::UdpSocket, String> {
     // Set up the socket addresses
-    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port.unwrap_or(0)));
+    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
     let destination_addr = SocketAddr::from((addr, 80));
 
     // Set up the communication socket
     // Note: We need to enable support for broadcast
+
+    // std::net::UdpSocket::set_nonblocking()
     let socket = tokio::net::UdpSocket::bind(unspecified_addr).await
         .map_err(|e| format!("Could not bind to any port. {}", e))?;
 
@@ -150,8 +152,9 @@ pub fn send_and_receive_many<I, T>(
 pub async fn send_and_receive_many_async<I, T>(
     msg: &[u8],
     addr: Ipv4Addr,
-    port: Option<u16>,
+    port: u16,
     cb: T,
+    read_timeout: Duration,
 ) -> Result<Vec<I>, String>
     where
         T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
@@ -163,10 +166,10 @@ pub async fn send_and_receive_many_async<I, T>(
     // Transform the results
     let mut results: Vec<I> = vec![];
     let mut recv_buffer = [0u8; 8092];
-    let timeout_duration = Duration::from_secs(3);
     loop {
-        match timeout(timeout_duration, socket.recv_from(&mut recv_buffer)).await {
+        match timeout(read_timeout, socket.recv_from(&mut recv_buffer)).await {
             Ok(Ok((len, addr))) => {
+                println!("received MSG");
                 results.push(cb(len, &recv_buffer[0..len], addr)?)
                 // Process the received data
             }
@@ -205,6 +208,7 @@ pub fn send_and_receive_one<I, T>(
     // Transform the result
     let mut recv_buffer = [0u8; 8092];
     if let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer) {
+        drop(socket);
         return Ok(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
     }
     drop(socket);
@@ -215,8 +219,9 @@ pub fn send_and_receive_one<I, T>(
 pub async fn send_and_receive_one_async<I, T>(
     msg: &[u8],
     addr: Ipv4Addr,
-    port: Option<u16>,
+    port: u16,
     cb: T,
+    response_timeout: Duration,
 ) -> Result<I, String>
     where
         T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
@@ -227,8 +232,7 @@ pub async fn send_and_receive_one_async<I, T>(
 
     // Transform the result
     let mut recv_buffer = [0u8; 8092];
-    let timeout_duration = Duration::from_secs(3);
-    let result = match timeout(timeout_duration, socket.recv_from(&mut recv_buffer)).await {
+    let result = match timeout(response_timeout, socket.recv_from(&mut recv_buffer)).await {
         Ok(Ok((len, addr))) => {
             Ok(cb(len, &recv_buffer[0..len], addr)?)
             // Process the received data

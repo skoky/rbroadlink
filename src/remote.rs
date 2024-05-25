@@ -155,8 +155,8 @@ impl RemoteDevice {
     }
 
     /// Sends an IR/RF code to the world.
-    pub async fn send_code_async(&self, code: &[u8]) -> Result<(), String> {
-        self.send_command_async(code, RemoteDataCommand::SendCode)
+    pub async fn send_code_async(&self, code: &[u8], response_timeout: Duration) -> Result<(), String> {
+        self.send_command_async(code, RemoteDataCommand::SendCode, response_timeout)
             .await
             .map_err(|e| format!("Could not send IR code to device! {}", e))?;
 
@@ -195,6 +195,7 @@ impl RemoteDevice {
         &self,
         payload: &[u8],
         command: RemoteDataCommand,
+        response_timeout: Duration
     ) -> Result<Vec<u8>, String> {
         // We cast this object to a generic device in order to make use of the shared
         // helper utilities.
@@ -209,7 +210,7 @@ impl RemoteDevice {
             .map_err(|e| format!("Could not pack remote data message! {}", e))?;
 
         let response = generic_device
-            .send_command_async::<RemoteDataMessage>(&packed)
+            .send_command_async::<RemoteDataMessage>(&packed,response_timeout)
             .await
             .map_err(|e| format!("Could not send code inside of the command! {}", e))?;
 

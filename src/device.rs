@@ -3,6 +3,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::from_utf8,
 };
+use std::time::Duration;
 
 use packed_struct::prelude::{PackedStruct, PackedStructSlice};
 
@@ -49,7 +50,7 @@ impl Device {
         );
     }
 
-    pub async fn from_ip_async(addr: Ipv4Addr, local_ip: Option<Ipv4Addr>) -> Result<Device, String> {
+    pub async fn from_ip_async(addr: Ipv4Addr, local_ip: Option<Ipv4Addr>, response_timeout: Duration) -> Result<Device, String> {
         // Grab the first non-loopback address
         let selected_ip = local_ip_or(local_ip)?;
 
@@ -61,9 +62,9 @@ impl Device {
             .map_err(|e| format!("Could not pack DiscoveryMessage! {}", e))?;
 
         return Ok(
-            send_and_receive_one_async(&msg, addr, Some(port), |bytes_received, bytes, addr| {
+            send_and_receive_one_async(&msg, addr, port, |bytes_received, bytes, addr| {
                 return create_device_from_packet(addr, bytes_received, bytes);
-            }).await
+            }, response_timeout).await
                 .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
         );
     }
@@ -98,7 +99,7 @@ impl Device {
     }
 
     /// List all devices in the current network. Optionally specify the local IP if on different subnets.
-    pub async fn list_async(ip: Option<Ipv4Addr>) -> Result<Vec<Device>, String> {
+    pub async fn list_async(ip: Option<Ipv4Addr>, response_timeout: Duration) -> Result<Vec<Device>, String> {
         // Grab the first non-loopback address
         let selected_ip = local_ip_or(ip)?;
 
@@ -112,11 +113,12 @@ impl Device {
         let results = send_and_receive_many_async(
             &msg,
             Ipv4Addr::BROADCAST,
-            Some(port),
+            port,
             |bytes_received, bytes, addr| {
                 return Ok(create_device_from_packet(addr, bytes_received, &bytes)
                     .map_err(|e| format!("Could not create device from packet! {}", e))?);
             },
+            response_timeout
         )
             .await
             .map_err(|e| format!("Could not send discovery message! {}", e))?;
@@ -199,7 +201,7 @@ impl Device {
 
     /// Sends a raw command to a broadlink device.
     /// Note: Try to avoid using this method in favor of more specific methods (e.g. [Device::authenticate], etc.)
-    pub async fn send_command_async<T>(&self, payload: &[u8]) -> Result<Vec<u8>, String>
+    pub async fn send_command_async<T>(&self, payload: &[u8], response_timeout: Duration) -> Result<Vec<u8>, String>
         where
             T: CommandTrait,
     {
@@ -214,9 +216,9 @@ impl Device {
             .map_err(|e| format!("Could not pack command with payload! {}", e))?;
 
         // Send the message to the device
-        return send_and_receive_one_async(&packed, info.address, None, |_, bytes, _| {
+        return send_and_receive_one_async(&packed, info.address, UDP_PORT, |_, bytes, _| {
             return CommandMessage::unpack_with_payload(bytes.to_vec(), &info.key);
-        }).await;
+        },response_timeout).await;
     }
 }
 

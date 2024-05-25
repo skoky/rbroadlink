@@ -1,12 +1,24 @@
 use std::net::Ipv4Addr;
+use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
 
 use rbroadlink::Device;
+use rbroadlink::traits::DeviceTrait;
 
 #[tokio::main]
 async fn main() {
-    let device_ip = Ipv4Addr::from_str("10.0.10.32").unwrap();
+
+    let devices = match Device::list_async(None, Duration::from_secs(3)).await {
+        Ok(devices) => devices,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            exit(1)
+        }
+    };
+
+    let device_ip = devices.first().expect("No device found").clone().get_info().address;
+    println!("Device IP {}", device_ip);
 
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(1)).await;
