@@ -6,6 +6,8 @@ use std::{
     time::Duration,
 };
 
+use tokio::time::timeout;
+
 /// Computes the checksum of a slice of bytes.
 ///
 /// The checksum is computed by summing all of the bytes with 0xBEAF and masking
@@ -95,7 +97,7 @@ fn send_and_receive_impl(
 async fn send_and_receive_impl_async(
     msg: &[u8],
     addr: Ipv4Addr,
-    port: Option<u16>
+    port: Option<u16>,
 ) -> Result<tokio::net::UdpSocket, String> {
     // Set up the socket addresses
     let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port.unwrap_or(0)));
@@ -105,14 +107,14 @@ async fn send_and_receive_impl_async(
     // Note: We need to enable support for broadcast
     let socket = tokio::net::UdpSocket::bind(unspecified_addr).await
         .map_err(|e| format!("Could not bind to any port. {}", e))?;
+
     socket
         .set_broadcast(true)
         .map_err(|e| format!("Could not enable broadcast. {}", e))?;
 
     // Send the message
-    // socket
-        // .set_read_timeout(read_timeout)
-        // .map_err(|e| format!("Could not set read timeout! {}", e))?;
+    // socket.set_read_timeout(Duration::from_secs(3))
+    //     .map_err(|e| format!("Could not set read timeout! {}", e))?;
     socket
         .send_to(&msg, destination_addr).await
         .map_err(|e| format!("Could not broadcast message! {}", e))?;
@@ -161,9 +163,27 @@ pub async fn send_and_receive_many_async<I, T>(
     // Transform the results
     let mut results: Vec<I> = vec![];
     let mut recv_buffer = [0u8; 8092];
-    while let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer).await {
-        results.push(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
+    let timeout_duration = Duration::from_secs(3);
+    loop {
+        match timeout(timeout_duration, socket.recv_from(&mut recv_buffer)).await {
+            Ok(Ok((len, addr))) => {
+                results.push(cb(len, &recv_buffer[0..len], addr)?)
+                // Process the received data
+            }
+            Ok(Err(e)) => {
+                eprintln!("Error receiving data: {}", e);
+                break;
+            }
+            Err(_) => {
+                println!("Receive operation timed out");
+                break;
+            }
+        };
     }
+
+    // while let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer).await {
+    //     results.push(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
+    // }
     drop(socket);
     return Ok(results);
 }
@@ -207,11 +227,28 @@ pub async fn send_and_receive_one_async<I, T>(
 
     // Transform the result
     let mut recv_buffer = [0u8; 8092];
-    if let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer).await {
-        return Ok(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
-    }
+    let timeout_duration = Duration::from_secs(3);
+    let result = match timeout(timeout_duration, socket.recv_from(&mut recv_buffer)).await {
+        Ok(Ok((len, addr))) => {
+            Ok(cb(len, &recv_buffer[0..len], addr)?)
+            // Process the received data
+        }
+        Ok(Err(e)) => {
+            eprintln!("Error receiving data: {}", e);
+            Err("Error receiving".to_string())
+        }
+        Err(_) => {
+            println!("Receive operation timed out");
+            Err("timeout".to_string())
+        }
+    };
+
+    // if let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer).await {
+    //     return Ok(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
+    // }
     drop(socket);
-    return Err("No response within timeout!".into());
+    // return Err("No response within timeout!".into());
+    return result;
 }
 
 /// Reverses a MAC address. Used to fix the backwards response from the broadlink device.
