@@ -209,7 +209,7 @@ pub async fn send_and_receive_one_async<I, T>(
     if let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer).await {
         return Ok(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
     }
-
+    drop(socket);
     return Err("No response within timeout!".into());
 }
 
