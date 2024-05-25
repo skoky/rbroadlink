@@ -140,6 +140,7 @@ pub fn send_and_receive_many<I, T>(
     while let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer) {
         results.push(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
     }
+    drop(socket);
     return Ok(results);
 }
 
@@ -186,7 +187,7 @@ pub fn send_and_receive_one<I, T>(
     if let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer) {
         return Ok(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
     }
-
+    drop(socket);
     return Err("No response within timeout!".into());
 }
 
