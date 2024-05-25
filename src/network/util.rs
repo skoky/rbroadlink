@@ -131,7 +131,7 @@ pub fn send_and_receive_many<I, T>(
         T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
 {
     // Get the socket
-    let socket = send_and_receive_impl(msg, addr, port)
+    let socket = send_and_receive_impl_async(msg, addr, port)
         .map_err(|e| format!("Could not create socket for message sending! {}", e))?;
 
     // Transform the results
@@ -140,7 +140,6 @@ pub fn send_and_receive_many<I, T>(
     while let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer) {
         results.push(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
     }
-
     return Ok(results);
 }
 
@@ -164,7 +163,7 @@ pub async fn send_and_receive_many_async<I, T>(
     while let Ok((bytes_received, addr)) = socket.recv_from(&mut recv_buffer).await {
         results.push(cb(bytes_received, &recv_buffer[0..bytes_received], addr)?);
     }
-
+    drop(socket);
     return Ok(results);
 }
 

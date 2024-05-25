@@ -7,15 +7,17 @@ use std::{
 use packed_struct::prelude::{PackedStruct, PackedStructSlice};
 
 use crate::{
-    network::{
-        util::{local_ip_or, send_and_receive_many, send_and_receive_one},
-        AuthenticationMessage, AuthenticationResponse, CommandMessage, DiscoveryMessage,
-        DiscoveryResponse, WirelessConnection, WirelessConnectionMessage,
-    },
-    traits::{CommandTrait, DeviceTrait},
-    DeviceInfo, HvacDevice, RemoteDevice, HVAC_CODES, REMOTE_CODES,
+    DeviceInfo,
+    HVAC_CODES,
+    HvacDevice, network::{
+        AuthenticationMessage,
+        AuthenticationResponse, CommandMessage, DiscoveryMessage, DiscoveryResponse,
+        util::{local_ip_or, send_and_receive_many, send_and_receive_one}, WirelessConnection, WirelessConnectionMessage,
+    }, REMOTE_CODES, RemoteDevice, traits::{CommandTrait, DeviceTrait},
 };
-use crate::network::util::send_and_receive_one_async;
+use crate::network::util::{send_and_receive_many_async, send_and_receive_one_async};
+
+const UDP_PORT: u16 = 42424;
 
 /// A generic broadlink device.
 pub enum Device {
@@ -33,7 +35,7 @@ impl Device {
         let selected_ip = local_ip_or(local_ip)?;
 
         // Construct the discovery message
-        let port = 42424;
+        let port = UDP_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -43,7 +45,7 @@ impl Device {
             send_and_receive_one(&msg, addr, Some(port), |bytes_received, bytes, addr| {
                 return create_device_from_packet(addr, bytes_received, bytes);
             })
-            .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
+                .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
         );
     }
 
@@ -52,7 +54,7 @@ impl Device {
         let selected_ip = local_ip_or(local_ip)?;
 
         // Construct the discovery message
-        let port = 42424;
+        let port = UDP_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -62,7 +64,7 @@ impl Device {
             send_and_receive_one_async(&msg, addr, Some(port), |bytes_received, bytes, addr| {
                 return create_device_from_packet(addr, bytes_received, bytes);
             }).await
-            .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
+                .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
         );
     }
 
@@ -72,7 +74,7 @@ impl Device {
         let selected_ip = local_ip_or(ip)?;
 
         // Construct the discovery message
-        let port = 42424;
+        let port = UDP_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -87,7 +89,7 @@ impl Device {
                     .map_err(|e| format!("Could not create device from packet! {}", e))?);
             },
         )
-        .map_err(|e| format!("Could not send discovery message! {}", e))?;
+            .map_err(|e| format!("Could not send discovery message! {}", e))?;
 
         // Remove duplicates
         // TODO
@@ -101,13 +103,13 @@ impl Device {
         let selected_ip = local_ip_or(ip)?;
 
         // Construct the discovery message
-        let port = 42424;
+        let port = UDP_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
             .map_err(|e| format!("Could not pack DiscoveryMessage! {}", e))?;
 
-        let results = send_and_receive_many(
+        let results = send_and_receive_many_async(
             &msg,
             Ipv4Addr::BROADCAST,
             Some(port),
@@ -116,7 +118,8 @@ impl Device {
                     .map_err(|e| format!("Could not create device from packet! {}", e))?);
             },
         )
-        .map_err(|e| format!("Could not send discovery message! {}", e))?;
+            .await
+            .map_err(|e| format!("Could not send discovery message! {}", e))?;
 
         // Remove duplicates
         // TODO
@@ -167,7 +170,7 @@ impl Device {
         send_and_receive_one(&packed, Ipv4Addr::BROADCAST, None, |_, _, _| {
             return Ok(());
         })
-        .map_err(|e| format!("Could not send connection message! {}", e))?;
+            .map_err(|e| format!("Could not send connection message! {}", e))?;
 
         return Ok(msg);
     }
@@ -175,8 +178,8 @@ impl Device {
     /// Sends a raw command to a broadlink device.
     /// Note: Try to avoid using this method in favor of more specific methods (e.g. [Device::authenticate], etc.)
     pub fn send_command<T>(&self, payload: &[u8]) -> Result<Vec<u8>, String>
-    where
-        T: CommandTrait,
+        where
+            T: CommandTrait,
     {
         let info = self.get_info();
 
@@ -197,8 +200,8 @@ impl Device {
     /// Sends a raw command to a broadlink device.
     /// Note: Try to avoid using this method in favor of more specific methods (e.g. [Device::authenticate], etc.)
     pub async fn send_command_async<T>(&self, payload: &[u8]) -> Result<Vec<u8>, String>
-    where
-        T: CommandTrait,
+        where
+            T: CommandTrait,
     {
         let info = self.get_info();
 
@@ -299,7 +302,7 @@ fn create_device_from_packet(
             return Err(format!(
                 "Unknown device: {} ({:#06X})",
                 response.model_code, response.model_code
-            ))
+            ));
         }
     };
 
