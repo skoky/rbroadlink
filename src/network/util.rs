@@ -169,16 +169,16 @@ pub async fn send_and_receive_many_async<I, T>(
     loop {
         match timeout(read_timeout, socket.recv_from(&mut recv_buffer)).await {
             Ok(Ok((len, addr))) => {
-                println!("received MSG");
+                // println!("received MSG");
                 results.push(cb(len, &recv_buffer[0..len], addr)?)
                 // Process the received data
             }
             Ok(Err(e)) => {
-                eprintln!("Error receiving data: {}", e);
+                // eprintln!("Error receiving data: {}", e);
                 break;
             }
             Err(_) => {
-                println!("Receive operation timed out");
+                // println!("Receive operation timed out");
                 break;
             }
         };
@@ -238,11 +238,11 @@ pub async fn send_and_receive_one_async<I, T>(
             // Process the received data
         }
         Ok(Err(e)) => {
-            eprintln!("Error receiving data: {}", e);
+            // eprintln!("Error receiving data: {}", e);
             Err("Error receiving".to_string())
         }
         Err(_) => {
-            println!("Receive operation timed out");
+            // println!("Receive operation timed out");
             Err("timeout".to_string())
         }
     };
