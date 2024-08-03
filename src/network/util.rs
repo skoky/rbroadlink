@@ -93,7 +93,7 @@ fn send_and_receive_impl(
     return Ok(socket);
 }
 
-async fn send_async(
+pub async fn send_async(
     msg: &[u8],
     addr: Ipv4Addr,
     port: u16,
