@@ -7,6 +7,7 @@ use std::{
 };
 
 use tokio::time::timeout;
+use crate::BROADLINK_UDP_RESPONSE_PORT;
 
 /// Computes the checksum of a slice of bytes.
 ///
@@ -93,14 +94,42 @@ fn send_and_receive_impl(
     return Ok(socket);
 }
 
-pub async fn send_async(
+pub async fn send_broadcast_async(
     msg: &[u8],
-    addr: Ipv4Addr,
-    port: u16,
 ) -> Result<tokio::net::UdpSocket, String> {
     // Set up the socket addresses
-    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
-    let destination_addr = SocketAddr::from((addr, 80));
+    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, BROADLINK_UDP_RESPONSE_PORT));
+    let destination_addr = SocketAddr::from((Ipv4Addr::BROADCAST, 80));
+
+    // Set up the communication socket
+    // Note: We need to enable support for broadcast
+
+    // std::net::UdpSocket::set_nonblocking()
+    let socket = tokio::net::UdpSocket::bind(unspecified_addr).await
+        .map_err(|e| format!("Could not bind to any port. {}", e))?;
+
+    socket
+        .set_broadcast(true)
+        .map_err(|e| format!("Could not enable broadcast. {}", e))?;
+
+    // Send the message
+    // socket.set_read_timeout(Duration::from_secs(3))
+    //     .map_err(|e| format!("Could not set read timeout! {}", e))?;
+    socket
+        .send_to(&msg, destination_addr).await
+        .map_err(|e| format!("Could not broadcast message! {}", e))?;
+
+    return Ok(socket);
+}
+
+
+pub async fn send_async(
+    msg: &[u8],
+    adr: Ipv4Addr,
+) -> Result<tokio::net::UdpSocket, String> {
+    // Set up the socket addresses
+    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, BROADLINK_UDP_RESPONSE_PORT));
+    let destination_addr = SocketAddr::from((adr, 80));
 
     // Set up the communication socket
     // Note: We need to enable support for broadcast
