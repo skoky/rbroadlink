@@ -93,6 +93,35 @@ fn send_and_receive_impl(
     return Ok(socket);
 }
 
+async fn send_async(
+    msg: &[u8],
+    addr: Ipv4Addr,
+    port: u16,
+) -> Result<tokio::net::UdpSocket, String> {
+    // Set up the socket addresses
+    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
+    let destination_addr = SocketAddr::from((addr, 80));
+
+    // Set up the communication socket
+    // Note: We need to enable support for broadcast
+
+    // std::net::UdpSocket::set_nonblocking()
+    let socket = tokio::net::UdpSocket::bind(unspecified_addr).await
+        .map_err(|e| format!("Could not bind to any port. {}", e))?;
+
+    socket
+        .set_broadcast(true)
+        .map_err(|e| format!("Could not enable broadcast. {}", e))?;
+
+    // Send the message
+    // socket.set_read_timeout(Duration::from_secs(3))
+    //     .map_err(|e| format!("Could not set read timeout! {}", e))?;
+    socket
+        .send_to(&msg, destination_addr).await
+        .map_err(|e| format!("Could not broadcast message! {}", e))?;
+
+    return Ok(socket);
+}
 
 async fn send_and_receive_impl_async(
     msg: &[u8],
@@ -173,7 +202,7 @@ pub async fn send_and_receive_many_async<I, T>(
                 results.push(cb(len, &recv_buffer[0..len], addr)?)
                 // Process the received data
             }
-            Ok(Err(e)) => {
+            Ok(Err(_)) => {
                 // eprintln!("Error receiving data: {}", e);
                 break;
             }
@@ -239,7 +268,7 @@ pub async fn send_and_receive_one_async<I, T>(
         }
         Ok(Err(e)) => {
             // eprintln!("Error receiving data: {}", e);
-            Err("Error receiving".to_string())
+            Err(format!("Error receiving {}",e))
         }
         Err(_) => {
             // println!("Receive operation timed out");

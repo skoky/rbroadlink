@@ -18,7 +18,7 @@ use crate::{
 };
 use crate::network::util::{send_and_receive_many_async, send_and_receive_one_async};
 
-const UDP_PORT: u16 = 42424;
+pub const BROADLINK_UDP_RESPONSE_PORT: u16 = 42424;
 
 /// A generic broadlink device.
 pub enum Device {
@@ -36,7 +36,7 @@ impl Device {
         let selected_ip = local_ip_or(local_ip)?;
 
         // Construct the discovery message
-        let port = UDP_PORT;
+        let port = BROADLINK_UDP_RESPONSE_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -55,7 +55,7 @@ impl Device {
         let selected_ip = local_ip_or(local_ip)?;
 
         // Construct the discovery message
-        let port = UDP_PORT;
+        let port = BROADLINK_UDP_RESPONSE_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -75,7 +75,7 @@ impl Device {
         let selected_ip = local_ip_or(ip)?;
 
         // Construct the discovery message
-        let port = UDP_PORT;
+        let port = BROADLINK_UDP_RESPONSE_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -104,7 +104,7 @@ impl Device {
         let selected_ip = local_ip_or(ip)?;
 
         // Construct the discovery message
-        let port = UDP_PORT;
+        let port = BROADLINK_UDP_RESPONSE_PORT;
         let discover = DiscoveryMessage::new(selected_ip, port, None)?;
         let msg = discover
             .pack()
@@ -216,9 +216,9 @@ impl Device {
             .map_err(|e| format!("Could not pack command with payload! {}", e))?;
 
         // Send the message to the device
-        return send_and_receive_one_async(&packed, info.address, UDP_PORT, |_, bytes, _| {
+        return send_and_receive_one_async(&packed, info.address, BROADLINK_UDP_RESPONSE_PORT, |_, bytes, _| {
             return CommandMessage::unpack_with_payload(bytes.to_vec(), &info.key);
-        },response_timeout).await;
+        }, response_timeout).await;
     }
 }
 
@@ -269,7 +269,7 @@ impl fmt::Display for Device {
 }
 
 /// Creates a device from a received network packet.
-fn create_device_from_packet(
+pub fn create_device_from_packet(
     addr: SocketAddr,
     bytes_received: usize,
     bytes: &[u8],
