@@ -98,7 +98,7 @@ fn send_and_receive_impl(
 pub async fn send_broadcast_async(
     msg: &[u8],
 ) -> Result<tokio::net::UdpSocket, String> {
-    send_async(msg, Ipv4Addr::BROADCAST)
+    send_async(msg, Ipv4Addr::BROADCAST).await
 }
 
 
