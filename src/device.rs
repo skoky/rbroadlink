@@ -44,7 +44,7 @@ impl Device {
 
         return Ok(
             send_and_receive_one(&msg, addr, Some(port), |bytes_received, bytes, addr| {
-                return create_device_from_packet(addr, bytes_received, bytes);
+                return create_device_from_packet(addr, bytes_received, bytes, false);
             })
                 .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
         );
@@ -63,7 +63,7 @@ impl Device {
 
         return Ok(
             send_and_receive_one_async(&msg, addr, port, |bytes_received, bytes, addr| {
-                return create_device_from_packet(addr, bytes_received, bytes);
+                return create_device_from_packet(addr, bytes_received, bytes, false);
             }, response_timeout).await
                 .map_err(|e| format!("Could not communicate with specified device! {}", e))?,
         );
@@ -86,7 +86,7 @@ impl Device {
             Ipv4Addr::BROADCAST,
             Some(port),
             |bytes_received, bytes, addr| {
-                return Ok(create_device_from_packet(addr, bytes_received, &bytes)
+                return Ok(create_device_from_packet(addr, bytes_received, &bytes, false)
                     .map_err(|e| format!("Could not create device from packet! {}", e))?);
             },
         )
@@ -115,7 +115,7 @@ impl Device {
             Ipv4Addr::BROADCAST,
             port,
             |bytes_received, bytes, addr| {
-                return Ok(create_device_from_packet(addr, bytes_received, &bytes)
+                return Ok(create_device_from_packet(addr, bytes_received, &bytes, false)
                     .map_err(|e| format!("Could not create device from packet! {}", e))?);
             },
             response_timeout
@@ -273,6 +273,7 @@ pub fn create_device_from_packet(
     addr: SocketAddr,
     bytes_received: usize,
     bytes: &[u8],
+    auth_later: bool
 ) -> Result<Device, String> {
     // Make sure that we have the required amount of bytes
     if bytes_received < 128 {
@@ -308,10 +309,12 @@ pub fn create_device_from_packet(
         }
     };
 
-    // Get the auth key for this device
-    device
-        .authenticate()
-        .map_err(|e| format!("Could not authenticate device! {}", e))?;
+    if !auth_later {
+        // Get the auth key for this device
+        device
+            .authenticate()
+            .map_err(|e| format!("Could not authenticate device! {}", e))?;
+    }
 
     return Ok(device);
 }
