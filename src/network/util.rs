@@ -7,6 +7,7 @@ use std::{
 };
 
 use tokio::time::timeout;
+
 use crate::BROADLINK_UDP_RESPONSE_PORT;
 
 /// Computes the checksum of a slice of bytes.
@@ -97,29 +98,7 @@ fn send_and_receive_impl(
 pub async fn send_broadcast_async(
     msg: &[u8],
 ) -> Result<tokio::net::UdpSocket, String> {
-    // Set up the socket addresses
-    let unspecified_addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, BROADLINK_UDP_RESPONSE_PORT));
-    let destination_addr = SocketAddr::from((Ipv4Addr::BROADCAST, 80));
-
-    // Set up the communication socket
-    // Note: We need to enable support for broadcast
-
-    // std::net::UdpSocket::set_nonblocking()
-    let socket = tokio::net::UdpSocket::bind(unspecified_addr).await
-        .map_err(|e| format!("Could not bind to any port. {}", e))?;
-
-    socket
-        .set_broadcast(true)
-        .map_err(|e| format!("Could not enable broadcast. {}", e))?;
-
-    // Send the message
-    // socket.set_read_timeout(Duration::from_secs(3))
-    //     .map_err(|e| format!("Could not set read timeout! {}", e))?;
-    socket
-        .send_to(&msg, destination_addr).await
-        .map_err(|e| format!("Could not broadcast message! {}", e))?;
-
-    return Ok(socket);
+    send_async(msg, Ipv4Addr::BROADCAST)
 }
 
 
@@ -189,8 +168,8 @@ pub fn send_and_receive_many<I, T>(
     port: Option<u16>,
     cb: T,
 ) -> Result<Vec<I>, String>
-    where
-        T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
+where
+    T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
 {
     // Get the socket
     let socket = send_and_receive_impl(msg, addr, port)
@@ -214,8 +193,8 @@ pub async fn send_and_receive_many_async<I, T>(
     cb: T,
     read_timeout: Duration,
 ) -> Result<Vec<I>, String>
-    where
-        T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
+where
+    T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
 {
     // Get the socket
     let socket = send_and_receive_impl_async(msg, addr, port).await
@@ -256,8 +235,8 @@ pub fn send_and_receive_one<I, T>(
     port: Option<u16>,
     cb: T,
 ) -> Result<I, String>
-    where
-        T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
+where
+    T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
 {
     // Get the socket
     let socket = send_and_receive_impl(msg, addr, port)
@@ -281,8 +260,8 @@ pub async fn send_and_receive_one_async<I, T>(
     cb: T,
     response_timeout: Duration,
 ) -> Result<I, String>
-    where
-        T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
+where
+    T: Fn(usize, &[u8], SocketAddr) -> Result<I, String>,
 {
     // Get the socket
     let socket = send_and_receive_impl_async(msg, addr, port).await
@@ -297,7 +276,7 @@ pub async fn send_and_receive_one_async<I, T>(
         }
         Ok(Err(e)) => {
             // eprintln!("Error receiving data: {}", e);
-            Err(format!("Error receiving {}",e))
+            Err(format!("Error receiving {}", e))
         }
         Err(_) => {
             // println!("Receive operation timed out");
