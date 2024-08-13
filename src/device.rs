@@ -291,7 +291,8 @@ pub fn create_device_from_packet(
 
     // Decode the name
     let raw_name = response.name.clone();
-    let name = from_utf8(&raw_name).map_err(|e| format!("Could not decode device name! {}", e))?;
+    let name_with_zeros = from_utf8(&raw_name).map_err(|e| format!("Could not decode device name! {}", e))?;
+    let name = name_with_zeros.trim_matches('\0');
 
     // Create the device conditionally based on the model code.
     let mut device = match &response.model_code {

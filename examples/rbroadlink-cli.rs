@@ -6,6 +6,7 @@ use clap::{ArgEnum, Parser, Subcommand};
 use rpassword::read_password_from_tty;
 
 use rbroadlink::{network::WirelessConnection, Device};
+use rbroadlink::traits::DeviceTrait;
 
 /// Command line arguments for the CLI
 #[derive(Parser, Debug)]
@@ -273,6 +274,7 @@ fn info(local_ip: Option<Ipv4Addr>, device_ip: Ipv4Addr) -> Result<(), String> {
     // Construct a device directly
     let device = Device::from_ip(device_ip, local_ip).expect("Could not connect to device!");
     println!("  {}", device);
+    println!("  {:?}", device.get_info());
 
     return Ok(());
 }
